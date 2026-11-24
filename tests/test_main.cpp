@@ -462,6 +462,78 @@ TEST(hot_reloaded_data_changes_behaviour) {
     CHECK(m.state().f[1].health == tuned.fighter.health - 70);
 }
 
+// ---------------------------------------------------------------- determinism
+
+struct RandomPad {
+    uint32_t rng;
+    InputBits cur = 0;
+    int hold = 0;
+    InputBits next() {
+        if (--hold <= 0) {
+            rng ^= rng << 13;
+            rng ^= rng >> 17;
+            rng ^= rng << 5;
+            cur = static_cast<InputBits>(rng & 0xFF);
+            hold = 1 + static_cast<int>((rng >> 8) % 14);
+        }
+        return cur;
+    }
+};
+
+TEST(replay_rebuilds_1M_frames_bit_exact) {
+    const uint64_t kTarget = 1u << 20;  // 1,048,576 frames
+    uint64_t frames = 0, sessions = 0, mismatches = 0, rounds = 0;
+    uint16_t statesSeen[2] = {0, 0};
+    const uint64_t illegalBefore = Match::illegalTransitions;
+    const auto t0 = std::chrono::steady_clock::now();
+
+    while (frames < kTarget) {
+        MatchConfig cfg;
+        cfg.bufferFrames = static_cast<uint8_t>((sessions % 3) * 3);  // 0, 3, 6
+        cfg.training = sessions % 7 == 0;
+        cfg.roundFrames = 40 * 60;
+        Match m;
+        m.reset(moves(), cfg);
+        CpuBrain cpu[2];
+        cpu[0].reset(static_cast<uint32_t>(sessions * 2 + 1), static_cast<int>(sessions % 4));
+        cpu[1].reset(static_cast<uint32_t>(sessions * 2 + 2), static_cast<int>((sessions + 1) % 4));
+        RandomPad pad{static_cast<uint32_t>(sessions * 7919 + 13)};
+        Replay rec;
+        rec.begin(cfg, moves().hash, 20000);
+        int tail = 0;
+        for (int i = 0; i < 20000 && tail < 30; ++i) {
+            const InputBits p1 = (sessions & 1) ? pad.next() : cpu[0].think(m, 0);
+            const InputBits p2 = cpu[1].think(m, 1);
+            m.step(p1, p2);
+            rec.record(p1, p2, m.hash());
+            for (int k = 0; k < 2; ++k) statesSeen[k] |= static_cast<uint16_t>(1u << static_cast<int>(m.state().f[k].state));
+            if (m.state().phase == Phase::MatchEnd) ++tail;
+        }
+        rounds += m.state().round;
+        const VerifyResult v = verifyReplay(rec, moves());
+        if (!v.ok) {
+            ++mismatches;
+            std::printf("    session %llu diverged at frame %lld\n", static_cast<unsigned long long>(sessions),
+                        static_cast<long long>(v.firstMismatch));
+        }
+        frames += rec.frames();
+        ++sessions;
+    }
+    const double secs = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
+    int covered = 0;
+    for (int s = 0; s < kStateCount; ++s) covered += ((statesSeen[0] | statesSeen[1]) >> s) & 1;
+    std::printf("    %llu frames, %llu matches, %llu rounds, hashed and re-simulated in %.2fs\n",
+                static_cast<unsigned long long>(frames), static_cast<unsigned long long>(sessions),
+                static_cast<unsigned long long>(rounds), secs);
+    std::printf("    per-frame hash mismatches: %llu, states visited: %d/%d, illegal transitions: %llu\n",
+                static_cast<unsigned long long>(mismatches), covered, kStateCount,
+                static_cast<unsigned long long>(Match::illegalTransitions - illegalBefore));
+    CHECK(frames >= 1000000);
+    CHECK(mismatches == 0);
+    CHECK(covered == kStateCount);
+    CHECK(Match::illegalTransitions == illegalBefore);
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
