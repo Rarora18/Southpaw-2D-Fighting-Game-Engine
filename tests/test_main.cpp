@@ -194,6 +194,47 @@ TEST(quarter_circle_forward_detection) {
     CHECK(!c.quarterCircleForward(+1, 0, 15));
 }
 
+// ---------------------------------------------------------------- geometry
+
+TEST(box_overlap_and_mirroring) {
+    const Box a{0, 0, toFx(10), toFx(10)};
+    CHECK(boxesOverlap(a, {toFx(5), toFx(5), toFx(10), toFx(10)}));
+    CHECK(!boxesOverlap(a, {toFx(10), 0, toFx(5), toFx(5)}));  // touching edges do not overlap
+
+    const Vec2 origin{toFx(100), 0};
+    const Box local{toFx(20), toFx(50), toFx(30), toFx(10)};
+    const Box worldR = localToWorld(local, origin, +1);
+    const Box worldL = localToWorld(local, origin, -1);
+    CHECK(worldR.x == toFx(120));
+    CHECK(worldL.x == toFx(50));  // mirrored: spans 50..80, in front of a left-facing fighter
+    const Box back = worldToLocal(worldL, origin, -1);
+    CHECK(back.x == local.x && back.y == local.y && back.w == local.w && back.h == local.h);
+}
+
+TEST(arc_contains_points) {
+    const ArcRegion arc{0, 0, toFx(20), toFx(100), 0, 90};
+    CHECK(pointInArc(arc, toFx(50), toFx(50)));
+    CHECK(!pointInArc(arc, toFx(10), toFx(5)));    // inside the inner radius
+    CHECK(!pointInArc(arc, toFx(90), toFx(90)));   // past the outer radius
+    CHECK(!pointInArc(arc, toFx(-50), toFx(10)));  // outside the angle range
+    CHECK(!pointInArc(arc, toFx(50), toFx(-10)));
+    const ArcRegion wide{0, 0, 0, toFx(100), -135, 135};  // > 180 degree sweep
+    CHECK(pointInArc(wide, toFx(-50), toFx(-10)) == false);
+    CHECK(pointInArc(wide, toFx(-10), toFx(50)));
+}
+
+TEST(arc_overlaps_box_all_cases) {
+    const ArcRegion arc{0, 0, toFx(40), toFx(100), -30, 60};
+    CHECK(arcOverlapsBox(arc, {toFx(60), toFx(-5), toFx(10), toFx(10)}));     // box inside arc
+    CHECK(arcOverlapsBox(arc, {toFx(-200), toFx(-200), toFx(400), toFx(400)}));  // arc inside box
+    CHECK(arcOverlapsBox(arc, {toFx(95), toFx(-5), toFx(40), toFx(10)}));     // straddles outer edge
+    CHECK(arcOverlapsBox(arc, {toFx(30), toFx(30), toFx(4), toFx(200)}));     // thin box crossing both arcs
+    CHECK(!arcOverlapsBox(arc, {toFx(-10), toFx(-10), toFx(20), toFx(20)}));  // inside the hole
+    CHECK(!arcOverlapsBox(arc, {toFx(-100), toFx(0), toFx(30), toFx(30)}));   // behind
+    CHECK(!arcOverlapsBox(arc, {toFx(10), toFx(80), toFx(10), toFx(10)}));    // above the sweep
+    CHECK(!arcOverlapsBox(arc, {toFx(120), toFx(0), toFx(10), toFx(10)}));    // out of reach
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
