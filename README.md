@@ -54,3 +54,39 @@ Without the buffer, a press after the cancel window closes is simply lost. With 
 | Replay from inputs (sim step only) | ~12,000,000 |
 | Replay + per-frame state hash validation | ~2,500,000 |
 | Full frame: 2 CPU brains + step + hash + record | ~2,300,000 |
+
+## Building
+
+Requires CMake 3.16+, a C++17 compiler and raylib 5.x. If raylib isn't installed, CMake downloads it.
+
+```bash
+brew install cmake raylib        # macOS (optional: raylib is fetched otherwise)
+cmake -S . -B build
+cmake --build build -j
+./build/southpaw                 # play
+./build/southpaw_tests           # test suite (also: cd build && ctest)
+./build/southpaw_bench 5000000   # headless benchmark
+```
+
+Command-line options:
+
+```
+southpaw --replay replays/file.sprp   # open a saved replay in the viewer
+southpaw --verify replays/file.sprp   # headless: re-simulate and check every frame hash
+southpaw --data path/to/moves.json    # alternate move data
+southpaw --capture dir                # self-playing demo that saves screenshots
+```
+
+To build only the engine, tests and benchmark without raylib: `cmake -S . -B build -DSOUTHPAW_BUILD_GAME=OFF`.
+
+## Controls
+
+| | Move | LP | HP | LK | HK |
+|---|---|---|---|---|---|
+| Player 1 | W A S D | U | I | J | K |
+| Player 2 | Arrows | , / Num4 | . / Num5 | M / Num1 | / / Num2 |
+| Gamepad | D-pad / stick | X | Y | A | B |
+
+Hold back to block, down-back to block lows; overheads must be blocked standing. The special move (`haymaker`) is quarter-circle forward + HP. The in-game *Controls & Moves* screen lists every move, generated from `moves.json`.
+
+Training keys: `F1` hitboxes, `F3` pause, `F4` step one frame, `F5` force reload, `F6` toggle input buffer, `F7` dummy mode, `F8` reset.
