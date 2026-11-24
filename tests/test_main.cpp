@@ -235,6 +235,65 @@ TEST(arc_overlaps_box_all_cases) {
     CHECK(!arcOverlapsBox(arc, {toFx(120), toFx(0), toFx(10), toFx(10)}));    // out of reach
 }
 
+// ---------------------------------------------------------------- state machine & combat
+
+TEST(state_machine_movement_states) {
+    Match m;
+    setup(m, 400);
+    const auto& f = m.state().f[0];
+    m.step(IN_RIGHT, 0);
+    CHECK(f.state == FState::WalkForward);
+    m.step(IN_LEFT, 0);
+    CHECK(f.state == FState::WalkBackward);
+    m.step(IN_DOWN, 0);
+    CHECK(f.state == FState::Crouch);
+    m.step(IN_UP, 0);
+    CHECK(f.state == FState::JumpSquat);
+    CHECK(stepUntil(m, 0, 0, 10, [&] { return f.state == FState::Airborne; }) == moves().fighter.jumpSquat);
+    CHECK(stepUntil(m, 0, 0, 120, [&] { return f.state == FState::Landing; }) > 0);
+    CHECK(stepUntil(m, 0, 0, 10, [&] { return f.state == FState::Idle; }) > 0);
+    CHECK(Match::illegalTransitions == 0);
+}
+
+TEST(jab_hits_on_first_active_frame) {
+    Match m;
+    setup(m, 90);
+    const MoveData& jab = moves().moves[moves().find("jab")];
+    m.step(IN_LP, 0);
+    CHECK(m.state().f[0].state == FState::Attack);
+    int frames = stepUntil(m, 0, 0, 30, [&] { return sawEvent(m, EventType::Hit, 0); });
+    CHECK(frames == jab.startup);
+    CHECK(m.state().f[1].state == FState::Hitstun);
+    CHECK(m.state().f[0].hitstop == jab.hitstop && m.state().f[1].hitstop == jab.hitstop);
+    CHECK(m.state().f[1].health == moves().fighter.health - jab.damage);
+}
+
+TEST(blocking_requires_holding_away_and_correct_height) {
+    {
+        Match m;  // standing block stops a mid
+        setup(m, 90, 6, 0);
+        m.step(IN_LP, IN_RIGHT);  // p2 is on the right, so right is "away"
+        stepUntil(m, 0, IN_RIGHT, 30, [&] { return m.events().count > 0; });
+        CHECK(sawEvent(m, EventType::Block));
+        CHECK(m.state().f[1].state == FState::Blockstun);
+    }
+    {
+        Match m;  // a low must be blocked crouching
+        setup(m, 90, 6, 0);
+        m.step(IN_DOWN | IN_LK, IN_RIGHT);
+        stepUntil(m, IN_DOWN, IN_RIGHT, 30, [&] { return m.events().count > 0; });
+        CHECK(sawEvent(m, EventType::Hit));
+    }
+    {
+        Match m;  // an overhead beats a crouching block
+        setup(m, 90, 6, 0);
+        m.step(IN_RIGHT, 0);
+        m.step(IN_RIGHT | IN_HK, IN_RIGHT | IN_DOWN);
+        stepUntil(m, 0, IN_RIGHT | IN_DOWN, 40, [&] { return m.events().count > 0 && (sawEvent(m, EventType::Hit) || sawEvent(m, EventType::Block)); });
+        CHECK(sawEvent(m, EventType::Hit));
+    }
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
