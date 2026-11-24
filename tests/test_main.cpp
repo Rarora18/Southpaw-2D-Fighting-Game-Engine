@@ -585,6 +585,29 @@ TEST(replay_file_round_trip) {
     CHECK(v.finalHash == m.hash());
 }
 
+TEST(game_loop_makes_zero_heap_allocations) {
+    MatchConfig cfg;
+    Match m;
+    m.reset(moves(), cfg);
+    CpuBrain a, b;
+    a.reset(77, 3);
+    b.reset(88, 2);
+    const int kFrames = 200000;
+    Replay rec;
+    rec.begin(cfg, moves().hash, kFrames);
+    const uint64_t before = sp_test::allocationCount();
+    for (int i = 0; i < kFrames; ++i) {
+        const InputBits p1 = a.think(m, 0), p2 = b.think(m, 1);
+        m.step(p1, p2);
+        rec.record(p1, p2, m.hash());
+        if (m.state().phase == Phase::MatchEnd) m.reset(moves(), cfg);
+    }
+    const uint64_t allocs = sp_test::allocationCount() - before;
+    std::printf("    heap allocations across %d frames (step + AI + hash + replay record): %llu\n", kFrames,
+                static_cast<unsigned long long>(allocs));
+    CHECK(allocs == 0);
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
