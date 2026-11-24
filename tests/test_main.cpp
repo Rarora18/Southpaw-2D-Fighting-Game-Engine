@@ -433,6 +433,35 @@ TEST(input_buffer_improves_late_combo_inputs) {
     CHECK(with == 100.0);
 }
 
+TEST(hot_reloaded_data_changes_behaviour) {
+    std::string text;
+    {
+        FILE* f = std::fopen(dataPath().c_str(), "rb");
+        CHECK(f != nullptr);
+        if (!f) return;
+        char buf[4096];
+        size_t n;
+        while ((n = std::fread(buf, 1, sizeof buf, f)) > 0) text.append(buf, n);
+        std::fclose(f);
+    }
+    const std::string from = "\"startup\": 4, \"active\": 2, \"recovery\": 7,\n      \"damage\": 40";
+    const size_t at = text.find(from);
+    CHECK(at != std::string::npos);
+    if (at == std::string::npos) return;
+    text.replace(at, from.size(), "\"startup\": 2, \"active\": 2, \"recovery\": 7,\n      \"damage\": 70");
+    MoveSet tuned;
+    std::string err;
+    CHECK(parseMoveSet(text, tuned, err));
+    CHECK(tuned.hash != moves().hash);
+
+    Match m;
+    setup(m, 90);
+    m.setMoves(tuned);
+    m.step(IN_LP, 0);
+    CHECK(stepUntil(m, 0, 0, 30, [&] { return sawEvent(m, EventType::Hit, 0); }) == 2);
+    CHECK(m.state().f[1].health == tuned.fighter.health - 70);
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
