@@ -23,3 +23,34 @@ A 2D fighting game I built from scratch in C++17 and raylib to learn how fightin
 - Versus CPU (4 difficulty levels), local 2-player (keyboard or gamepads), training mode, and a replay viewer with live per-frame hash verification.
 - Training mode: input history, frame data, frame advantage readout, hitbox overlay, frame-by-frame stepping, buffer on/off toggle, dummy modes.
 - Hit sparks, screen shake, K.O. slow motion, and sound effects synthesized at startup (no asset files).
+
+## Results
+
+All numbers come from `southpaw_tests` and `southpaw_bench` (Release build, Apple M2 Pro).
+
+**Input buffer.** The test attempts three two-hit chains with the follow-up pressed 0–5 frames after the starter's 3-frame cancel window opens:
+
+```
+      follow-up lateness (frames) 0 1 2 3 4 5
+    no buffer:
+      jab > cross            Y Y Y . . .
+      crouch jab > low kick  Y Y Y . . .
+      short kick > cross     Y Y Y . . .
+    6-frame buffer:
+      jab > cross            Y Y Y Y Y Y
+      crouch jab > low kick  Y Y Y Y Y Y
+      short kick > cross     Y Y Y Y Y Y
+    combo success: 50% without buffer -> 100% with 6-frame buffer
+```
+
+Without the buffer, a press after the cancel window closes is simply lost. With it, the press survives until recovery ends and comes out as a link, and the starter's hitstun is long enough for it to still combo.
+
+**Determinism.** CPU and random-input matches over **1,049,802 frames** (140 matches, mixed buffer and training settings) were recorded, then rebuilt from inputs alone. Result: 0 per-frame hash mismatches, 12/12 states visited, 0 illegal transitions. A single flipped button on one frame is detected on exactly that frame.
+
+**Throughput** (headless, 5M frames, 0 heap allocations in every loop):
+
+| Loop | frames/sec |
+|---|---|
+| Replay from inputs (sim step only) | ~12,000,000 |
+| Replay + per-frame state hash validation | ~2,500,000 |
+| Full frame: 2 CPU brains + step + hash + record | ~2,300,000 |
