@@ -30,3 +30,12 @@ target_include_directories(southpaw_core PUBLIC src)
 target_compile_options(southpaw_core PRIVATE ${SOUTHPAW_WARNINGS})
 
 set(SOUTHPAW_DATA_DIR "${CMAKE_CURRENT_SOURCE_DIR}/data")
+
+# ---------------------------------------------------------------- tests
+add_executable(southpaw_tests tests/test_main.cpp tests/alloc_counter.cpp)
+target_link_libraries(southpaw_tests PRIVATE southpaw_core)
+target_compile_definitions(southpaw_tests PRIVATE SOUTHPAW_DATA_DIR="${SOUTHPAW_DATA_DIR}")
+target_compile_options(southpaw_tests PRIVATE ${SOUTHPAW_WARNINGS})
+
+enable_testing()
+add_test(NAME southpaw_tests COMMAND southpaw_tests)
