@@ -118,6 +118,39 @@ TEST(json_reports_errors_with_line_numbers) {
     CHECK(!Json::parse("{} trailing", j, err));
 }
 
+TEST(move_data_loads) {
+    const MoveSet& ms = moves();
+    CHECK(ms.count == 14);
+    const int jab = ms.find("jab");
+    CHECK(jab >= 0);
+    CHECK(ms.moves[jab].startup == 4 && ms.moves[jab].active == 2 && ms.moves[jab].recovery == 7);
+    CHECK(ms.moves[jab].cancelCount == 3);
+    CHECK(ms.moves[ms.find("uppercut")].hit.shape == Shape::Arc);
+    CHECK(ms.moves[ms.find("haymaker")].motion);
+    CHECK(ms.hash != 0);
+}
+
+TEST(move_data_rejects_bad_files) {
+    MoveSet ms;
+    std::string err;
+    const std::string fighter =
+        "\"fighter\": {\"health\": 100, \"hurtbox_stand\": [0,0,1,1], \"hurtbox_crouch\": [0,0,1,1], "
+        "\"hurtbox_air\": [0,0,1,1]}";
+    const std::string good = "{" + fighter +
+                             ", \"moves\": [{\"name\": \"a\", \"anim\": \"jab\", \"button\": \"LP\", \"startup\": 3, "
+                             "\"active\": 2, \"recovery\": 5, \"damage\": 10, \"hitstun\": 10, \"blockstun\": 5, "
+                             "\"hitbox\": {\"x\": 0, \"y\": 0, \"w\": 10, \"h\": 10}";
+    CHECK(parseMoveSet(good + "}]}", ms, err));
+    CHECK(!parseMoveSet(good + ", \"cancels\": [\"nope\"]}]}", ms, err));
+    CHECK(err.find("unknown move \"nope\"") != std::string::npos);
+    const std::string badArc = "{" + fighter +
+                               ", \"moves\": [{\"name\": \"a\", \"anim\": \"jab\", \"button\": \"LP\", \"startup\": 3, "
+                               "\"active\": 2, \"recovery\": 5, \"damage\": 10, \"hitstun\": 10, \"blockstun\": 5, "
+                               "\"hitbox\": {\"type\": \"arc\", \"inner\": 50, \"outer\": 20, \"from\": 0, \"to\": 90}}]}";
+    CHECK(!parseMoveSet(badArc, ms, err));
+    CHECK(err.find("inner < outer") != std::string::npos);
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
