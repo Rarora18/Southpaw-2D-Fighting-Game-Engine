@@ -612,7 +612,6 @@ void App::drawControls() {
     }
     renderer_.text("frame data shown as startup / active / recovery      ESC back", Renderer::kWidth / 2.0f,
                    Renderer::kHeight - 40, 20, {200, 190, 210, 200}, Align::Center);
-    if (menuBack() || menuOk()) screen_ = Screen::Title;
 }
 
 const char* App::captureUpdate() {
@@ -727,7 +726,9 @@ void App::run() {
                 break;
             case Screen::Fight: updateFight(dt); break;
             case Screen::Replay: updateReplay(dt); break;
-            case Screen::Controls: break;
+            case Screen::Controls:
+                if (menuBack() || menuOk()) screen_ = Screen::Title;
+                break;
         }
 
         BeginDrawing();
