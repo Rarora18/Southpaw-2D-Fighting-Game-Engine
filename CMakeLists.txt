@@ -10,6 +10,8 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
   set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
 endif()
 
+option(SOUTHPAW_BUILD_GAME "Build the raylib front end" ON)
+
 if(MSVC)
   set(SOUTHPAW_WARNINGS /W4)
 else()
@@ -44,3 +46,31 @@ target_compile_options(southpaw_bench PRIVATE ${SOUTHPAW_WARNINGS})
 
 enable_testing()
 add_test(NAME southpaw_tests COMMAND southpaw_tests)
+
+# ---------------------------------------------------------------- game
+if(SOUTHPAW_BUILD_GAME)
+  find_package(raylib 5.0 QUIET)
+  if(NOT raylib_FOUND)
+    message(STATUS "raylib not found, fetching 5.5")
+    include(FetchContent)
+    set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+    set(BUILD_GAMES OFF CACHE BOOL "" FORCE)
+    FetchContent_Declare(raylib
+      URL https://github.com/raysan5/raylib/archive/refs/tags/5.5.tar.gz
+      DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
+    FetchContent_MakeAvailable(raylib)
+  endif()
+
+  add_executable(southpaw
+    src/game/main.cpp
+    src/game/pose.cpp
+    src/game/renderer.cpp
+    src/game/sfx.cpp
+  )
+  target_link_libraries(southpaw PRIVATE southpaw_core raylib)
+  target_compile_definitions(southpaw PRIVATE SOUTHPAW_DATA_DIR="${SOUTHPAW_DATA_DIR}")
+  target_compile_options(southpaw PRIVATE ${SOUTHPAW_WARNINGS})
+  if(APPLE)
+    target_link_libraries(southpaw PRIVATE "-framework IOKit" "-framework Cocoa" "-framework OpenGL")
+  endif()
+endif()
