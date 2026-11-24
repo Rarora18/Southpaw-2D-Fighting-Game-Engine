@@ -151,6 +151,49 @@ TEST(move_data_rejects_bad_files) {
     CHECK(err.find("inner < outer") != std::string::npos);
 }
 
+// ---------------------------------------------------------------- input
+
+TEST(input_buffer_window_and_consume) {
+    InputBuffer b;
+    b.clear();
+    b.push(0);
+    b.push(IN_LP);  // press
+    for (int i = 0; i < 4; ++i) b.push(0);
+    CHECK(b.findPress(0, 0) == -1);  // no buffer: only this frame counts
+    CHECK(b.findPress(0, 6) == 4);
+    CHECK(b.findPress(0, 3) == -1);
+    b.consume(0, 4);
+    CHECK(b.findPress(0, 6) == -1);  // a press can only start one move
+    b.push(IN_LP);
+    CHECK(b.findPress(0, 0) == 0);
+    CHECK(b.findPress(1, 6) == -1);
+}
+
+TEST(input_held_button_is_not_a_new_press) {
+    InputBuffer b;
+    b.clear();
+    for (int i = 0; i < 10; ++i) b.push(IN_HP);
+    CHECK(b.findPress(1, 6) == -1);  // first press is 9 frames back
+    b.push(0);
+    b.push(IN_HP);
+    CHECK(b.findPress(1, 0) == 0);
+}
+
+TEST(quarter_circle_forward_detection) {
+    InputBuffer b;
+    b.clear();
+    b.push(IN_DOWN);
+    b.push(IN_DOWN | IN_RIGHT);
+    b.push(IN_RIGHT | IN_HP);
+    CHECK(b.quarterCircleForward(+1, 0, 15));
+    CHECK(!b.quarterCircleForward(-1, 0, 15));  // facing left the motion is backwards
+    InputBuffer c;
+    c.clear();
+    c.push(IN_DOWN);
+    c.push(IN_RIGHT | IN_HP);  // skipped the diagonal
+    CHECK(!c.quarterCircleForward(+1, 0, 15));
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
