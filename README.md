@@ -90,3 +90,31 @@ To build only the engine, tests and benchmark without raylib: `cmake -S . -B bui
 Hold back to block, down-back to block lows; overheads must be blocked standing. The special move (`haymaker`) is quarter-circle forward + HP. The in-game *Controls & Moves* screen lists every move, generated from `moves.json`.
 
 Training keys: `F1` hitboxes, `F3` pause, `F4` step one frame, `F5` force reload, `F6` toggle input buffer, `F7` dummy mode, `F8` reset.
+
+## Tuning moves without recompiling
+
+Run the game, open `data/moves.json`, change something (for example, set the jab's `"startup"` to 2 or its `"damage"` to 70) and save. A toast confirms the reload and the new frame data takes effect immediately. Hitboxes are authored facing right with the origin at the fighter's feet:
+
+```jsonc
+"hitbox": { "type": "box", "x": 30, "y": 128, "w": 62, "h": 24 }
+// strike arc swept from `from` to `to` degrees across the active frames
+"hitbox": { "type": "arc", "cx": 14, "cy": 118, "inner": 18, "outer": 82, "from": -40, "to": 100 }
+```
+
+## Layout
+
+```
+src/core/       simulation: fixed-point math, JSON loader, move data, input buffer,
+                collision, match/state machine, replays, CPU AI
+src/game/       raylib front end: renderer, procedural poses, synthesized SFX, menus
+data/           moves.json
+tests/          test suite + heap allocation counter
+bench/          headless throughput benchmark
+```
+
+## Determinism notes
+
+- All simulation math is integer (24.8 fixed point). Trig for arc directions comes from a 360-entry table rounded to 1/4096, so platform libm differences can't leak in.
+- `MatchState` is plain data with fixed-size arrays: the input ring buffer, a fixed event queue, and no pointers into the heap. Stepping a frame never allocates.
+- Simultaneous hits are collected first and applied together, so trades resolve the same way regardless of update order.
+- Replays store the move-data hash. Playback with different data is flagged, and the viewer shows the exact frame where it desyncs.
