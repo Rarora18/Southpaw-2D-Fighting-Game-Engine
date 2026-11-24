@@ -18,6 +18,7 @@ endif()
 
 # ---------------------------------------------------------------- core (no raylib)
 add_library(southpaw_core STATIC
+  src/core/ai.cpp
   src/core/combat.cpp
   src/core/input.cpp
   src/core/json.cpp
