@@ -357,6 +357,31 @@ TEST(corner_pushback_moves_attacker) {
     CHECK(m.state().f[0].pos.x < before - toFx(10));
 }
 
+TEST(uppercut_arc_anti_airs_a_jump_in) {
+    Match m;
+    setup(m, 90);
+    auto& s = m.mutableState();
+    s.f[1].pos = {s.f[0].pos.x + toFx(60), toFx(110)};
+    s.f[1].air = 1;
+    s.f[1].state = FState::Airborne;
+    s.f[1].airAttackUsed = 1;
+    s.f[1].vel = {0, 0};
+    m.step(IN_DOWN | IN_HP, 0);
+    stepUntil(m, IN_DOWN, 0, 12, [&] { return sawEvent(m, EventType::Hit, 0); });
+    CHECK(sawEvent(m, EventType::Hit, 0));
+    CHECK(m.state().f[1].launched == 1);
+}
+
+TEST(special_move_from_quarter_circle) {
+    Match m;
+    setup(m, 120);
+    m.step(IN_DOWN, 0);
+    m.step(IN_DOWN | IN_RIGHT, 0);
+    m.step(IN_RIGHT | IN_HP, 0);
+    CHECK(m.state().f[0].state == FState::Attack);
+    CHECK(m.state().f[0].move == moves().find("haymaker"));
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
