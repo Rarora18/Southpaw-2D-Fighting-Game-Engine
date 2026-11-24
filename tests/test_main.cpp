@@ -382,6 +382,57 @@ TEST(special_move_from_quarter_circle) {
     CHECK(m.state().f[0].move == moves().find("haymaker"));
 }
 
+// The headline input-buffer experiment. A two-hit chain is attempted with the
+// follow-up pressed 0..5 frames after the starter's cancel window opens.
+// Inside the 3-frame window it cancels; after that it only combos if the press
+// survives until recovery ends (the buffer turns it into a link).
+double comboSuccessRate(int buffer, bool print) {
+    struct Chain {
+        const char* name;
+        InputBits hold, starter, follow;
+    };
+    const Chain chains[] = {
+        {"jab > cross", 0, IN_LP, IN_HP},
+        {"crouch jab > low kick", IN_DOWN, IN_LP, IN_LK},
+        {"short kick > cross", 0, IN_LK, IN_HP},
+    };
+    int ok = 0, total = 0;
+    for (const Chain& c : chains) {
+        if (print) std::printf("      %-22s", c.name);
+        for (int late = 0; late <= 5; ++late) {
+            Match m;
+            setup(m, 90, static_cast<uint8_t>(buffer));
+            m.step(c.hold | c.starter, 0);
+            stepUntil(m, c.hold, 0, 40, [&] { return sawEvent(m, EventType::Hit, 0); });
+            while (m.state().f[0].hitstop > 0) m.step(c.hold, 0);  // window opens on the next frame
+            for (int i = 0; i < late; ++i) m.step(c.hold, 0);
+            uint16_t best = m.state().f[1].comboHits;
+            m.step(c.hold | c.follow, 0);
+            for (int i = 0; i < 60; ++i) {
+                if (m.state().f[1].comboHits > best) best = m.state().f[1].comboHits;
+                m.step(c.hold, 0);
+            }
+            const bool combo = best >= 2;
+            ok += combo;
+            ++total;
+            if (print) std::printf(" %s", combo ? "Y" : ".");
+        }
+        if (print) std::printf("\n");
+    }
+    return 100.0 * ok / total;
+}
+
+TEST(input_buffer_improves_late_combo_inputs) {
+    std::printf("      follow-up lateness (frames) 0 1 2 3 4 5\n");
+    std::printf("    no buffer:\n");
+    const double without = comboSuccessRate(0, true);
+    std::printf("    6-frame buffer:\n");
+    const double with = comboSuccessRate(6, true);
+    std::printf("    combo success: %.0f%% without buffer -> %.0f%% with 6-frame buffer\n", without, with);
+    CHECK(without == 50.0);
+    CHECK(with == 100.0);
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
