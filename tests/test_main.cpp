@@ -534,6 +534,57 @@ TEST(replay_rebuilds_1M_frames_bit_exact) {
     CHECK(Match::illegalTransitions == illegalBefore);
 }
 
+TEST(replay_detects_a_single_changed_input) {
+    MatchConfig cfg;
+    Match m;
+    m.reset(moves(), cfg);
+    CpuBrain a, b;
+    a.reset(11, 2);
+    b.reset(22, 2);
+    Replay rec;
+    rec.begin(cfg, moves().hash, 3000);
+    for (int i = 0; i < 3000; ++i) {
+        const InputBits p1 = a.think(m, 0), p2 = b.think(m, 1);
+        m.step(p1, p2);
+        rec.record(p1, p2, m.hash());
+    }
+    CHECK(verifyReplay(rec, moves()).ok);
+    Replay tampered = rec;
+    tampered.inputs[2000 * 2] ^= IN_HK;  // flip one button on one frame (fight phase)
+    const VerifyResult v = verifyReplay(tampered, moves());
+    CHECK(!v.ok);
+    CHECK(v.firstMismatch == 2000);
+}
+
+TEST(replay_file_round_trip) {
+    MatchConfig cfg;
+    cfg.bufferFrames = 3;
+    Match m;
+    m.reset(moves(), cfg);
+    CpuBrain a, b;
+    a.reset(5, 3);
+    b.reset(6, 1);
+    Replay rec;
+    rec.begin(cfg, moves().hash, 5000);
+    for (int i = 0; i < 5000; ++i) {
+        const InputBits p1 = a.think(m, 0), p2 = b.think(m, 1);
+        m.step(p1, p2);
+        rec.record(p1, p2, m.hash());
+    }
+    const std::string path = "southpaw_test_replay.sprp";
+    std::string err;
+    CHECK(rec.save(path, err));
+    Replay loaded;
+    CHECK(loaded.load(path, err));
+    std::remove(path.c_str());
+    CHECK(loaded.frames() == rec.frames());
+    CHECK(loaded.movesHash == moves().hash);
+    CHECK(loaded.config.bufferFrames == 3);
+    const VerifyResult v = verifyReplay(loaded, moves());
+    CHECK(v.ok);
+    CHECK(v.finalHash == m.hash());
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
