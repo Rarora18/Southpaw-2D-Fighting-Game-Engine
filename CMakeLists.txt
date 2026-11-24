@@ -22,6 +22,7 @@ add_library(southpaw_core STATIC
   src/core/input.cpp
   src/core/json.cpp
   src/core/move_data.cpp
+  src/core/replay.cpp
   src/core/sim.cpp
 )
 target_include_directories(southpaw_core PUBLIC src)
