@@ -2,6 +2,23 @@
 
 A 2D fighting game I built from scratch in C++17 and raylib to learn how fighting games work under the hood. Moves run on frame data loaded from JSON, hits are checked with custom collision (boxes and swept strike arcs), inputs are buffered so combos feel responsive, and any match can be replayed exactly from inputs alone.
 
+![Southpaw title screen, with a live CPU-vs-CPU match running behind the menu](docs/screenshots/01_title.png)
+
+## Screenshots
+
+| Combos with damage scaling | Hitbox overlay (F1): swept strike arc vs. hurtboxes |
+|---|---|
+| ![A two-hit combo with the combo counter and hit spark](docs/screenshots/02_combo.png) | ![Debug overlay showing hurtboxes, an active hitbox and live state labels](docs/screenshots/03_hitboxes.png) |
+| **K.O. with slow motion** | **Match end** |
+| ![K.O. banner with impact ring and counter-hit popup](docs/screenshots/04_ko.png) | ![Winner screen after the final round](docs/screenshots/05_match_end.png) |
+| **Replay viewer: every frame's state hash verified live** | **Training mode: input history, frame data, block-all dummy** |
+| ![Replay playback with both players' input history and a VERIFIED hash readout](docs/screenshots/06_replay.png) | ![Training mode with input log, frame data panel and hitboxes](docs/screenshots/07_training.png) |
+
+The move list on the *Controls & Moves* screen is generated straight from `moves.json`:
+
+![Controls screen with the full move list and frame data](docs/screenshots/08_controls.png)
+
+Every screenshot here comes from the game itself: `./build/southpaw --capture docs/screenshots` plays a CPU-vs-CPU match, a replay and a training session, and saves each frame.
 
 ## Features
 
