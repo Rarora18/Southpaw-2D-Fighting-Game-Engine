@@ -294,6 +294,69 @@ TEST(blocking_requires_holding_away_and_correct_height) {
     }
 }
 
+TEST(cross_up_guard_direction_and_facing_check) {
+    // p1 has jumped just past p2 and is still facing right, so p2 is behind it.
+    enum { None, Hit, Blocked };
+    auto run = [&](InputBits attack, InputBits defend, const MoveSet* override) {
+        Match m;
+        setup(m, 200, 6, 0);
+        if (override) m.setMoves(*override);
+        auto& s = m.mutableState();
+        s.f[0].pos = {s.f[1].pos.x + toFx(30), toFx(120)};
+        s.f[0].air = 1;
+        s.f[0].state = FState::Airborne;
+        s.f[0].facing = 1;
+        s.f[0].vel = {0, -toFx(2)};
+        m.step(attack, defend);
+        for (int i = 0; i < 12; ++i) {
+            m.step(0, defend);
+            if (sawEvent(m, EventType::Hit)) return Hit;
+            if (sawEvent(m, EventType::Block)) return Blocked;
+        }
+        return None;
+    };
+    // The attacker is now on p2's right: holding the old "back" (right) gets hit.
+    CHECK(run(IN_LK, IN_RIGHT, nullptr) == Hit);
+    CHECK(run(IN_LK, IN_LEFT, nullptr) == Blocked);
+    // Same kick flagged front-only can't connect with someone behind the attacker.
+    MoveSet frontOnly = moves();
+    frontOnly.moves[frontOnly.find("jump_kick")].frontOnly = true;
+    CHECK(run(IN_LK, IN_RIGHT, &frontOnly) == None);
+}
+
+TEST(knockback_pushes_away_from_attacker) {
+    for (int side : {+1, -1}) {
+        Match m;
+        setup(m, 90);
+        auto& s = m.mutableState();
+        if (side < 0) {  // swap sides
+            std::swap(s.f[0].pos.x, s.f[1].pos.x);
+            m.step(0, 0);
+        }
+        const fx before = m.state().f[1].pos.x;
+        m.step(IN_HP, 0);
+        stepUntil(m, 0, 0, 40, [&] { return m.state().f[1].state == FState::Hitstun; });
+        stepUntil(m, 0, 0, 30, [&] { return m.state().f[1].slide == 0; });
+        const fx moved = m.state().f[1].pos.x - before;
+        CHECK(sign(moved) == side);
+        CHECK(fxAbs(moved) > toFx(15));
+    }
+}
+
+TEST(corner_pushback_moves_attacker) {
+    Match m;
+    setup(m, 90);
+    auto& s = m.mutableState();
+    const fx wall = Match::kStageHalfWidth - moves().fighter.pushWidth;
+    s.f[1].pos.x = wall;
+    s.f[0].pos.x = wall - toFx(90);
+    const fx before = s.f[0].pos.x;
+    m.step(IN_HP, 0);
+    stepUntil(m, 0, 0, 40, [&] { return m.state().f[0].slide != 0; });
+    stepUntil(m, 0, 0, 40, [&] { return m.state().f[0].slide == 0; });
+    CHECK(m.state().f[0].pos.x < before - toFx(10));
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
